@@ -3,7 +3,9 @@
 # Admin can register BHW directly — NO OTP required
 # ============================================================
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+import secrets
+import string
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -11,6 +13,9 @@ from database import get_db
 from models.models import User
 from middleware.auth import get_current_user, require_admin, get_client_info
 from utils.security import hash_password, validate_password_strength
+
+# I-import ang bagong email function na inayos natin kanina
+from utils.email_utils import send_temporary_password_email
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -29,42 +34,54 @@ async def get_all_users(
     users = query.order_by(User.name).all()
     return [_format_user(u) for u in users]
 
+# IDAGDAG ITONG FUNCTION NA ITO SA ITAAS NG @router.post("/register")
+def generate_temporary_password(length=12) -> str:
+    """Generates a secure random alphanumeric password."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%&*"
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
 
 @router.post("/register", status_code=201)
 async def register_bhw(
     request: Request,
+    background_tasks: BackgroundTasks,
+    body: dict = None, # IDAGDAG ITONG LINYANG ITO para lumabas ang text box sa Swagger Docs!
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin)
 ):
     """
     Mag-register ng bagong BHW account (Admin only).
-    Walang OTP verification — direktang nire-register ng Admin.
+    Walang OTP verification — direktang nire-register ng Admin gamit ang Auto-generated Temp Password at Email.
     Roles: admin, bhw, midwife, doctor
     """
     body = await request.json()
     name     = body.get("name", "").strip()
     email    = body.get("email", "").strip().lower()
-    password = body.get("password", "")
     position = body.get("position", "")
     role     = body.get("role", "bhw")
 
-    if not name or not email or not password:
-        raise HTTPException(status_code=400, detail="Name, email, and password are required.")
+    # Inalis ang password verification sa input validation dahil system na ang gagawa nito
+    if not name or not email:
+        raise HTTPException(status_code=400, detail="Name and email are required.")
 
     # Check duplicate email
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email is already registered.")
 
-    # Validate password strength
-    is_strong, msg = validate_password_strength(password)
+    # 1. Awtomatikong pag-generate ng secure temporary password
+    temp_password = generate_temporary_password()
+
+    # 2. Siguraduhing pasado ang nagawang password sa inyong password strength validation logic
+    is_strong, msg = validate_password_strength(temp_password)
     if not is_strong:
-        raise HTTPException(status_code=400, detail=msg)
+        # Kung sakaling sumablay (mababa ang chance), mag-generate muli ng may kasamang siguradong upper, lower, at digits
+        temp_password = secrets.choice(string.ascii_uppercase) + secrets.choice(string.ascii_lowercase) + secrets.choice(string.digits) + generate_temporary_password(9)
 
     new_user = User(
         name           = name,
         email          = email,
-        password_hash  = hash_password(password),
+        password_hash  = hash_password(temp_password), # I-hash ang auto-generated password natin
         role           = role if role in ["admin", "bhw", "midwife", "doctor"] else "bhw",
         position       = position or None,
         status         = "active",
@@ -73,6 +90,15 @@ async def register_bhw(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # Palitan ang lumang send_temporary_password_email nito:
+    background_tasks.add_task(
+        send_temporary_password_email, # Ito na uli ang gagamitin natin
+        email=new_user.email,
+        name=new_user.name,
+        role=new_user.role,
+        temp_password=temp_password
+    )
 
     return _format_user(new_user)
 

@@ -511,7 +511,7 @@ app.include_router(audit_router)
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
 
-for folder in ["css", "js", "pages", "assets"]:
+for folder in ["css", "js", "pages", "assets", "img", "vendor"]:
     path = os.path.join(FRONTEND_DIR, folder)
     if os.path.exists(path):
         app.mount(f"/frontend/{folder}", StaticFiles(directory=path), name=folder)

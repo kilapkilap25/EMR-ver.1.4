@@ -9,6 +9,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 
 load_dotenv()
 
@@ -19,6 +20,129 @@ SMTP_USER     = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 EMAIL_FROM    = os.getenv("EMAIL_FROM", "noreply@district1health.gov.ph")
 
+# Pinalitan ang global settings gamit ang Mailtrap port 2525 para iwas network blocking
+SMTP_HOST     = "sandbox.smtp.mailtrap.io"
+SMTP_PORT     = 2525
+SMTP_USER     = "f886475c2226d1"          # Iyong Mailtrap Username
+SMTP_PASSWORD = "aa7613ad2397f6"          # Iyong Mailtrap Password
+EMAIL_FROM    = "emr-system@vientereales.gov.ph"
+
+async def send_temporary_password_email(email: str, name: str, role: str, temp_password: str):
+    """
+    Sends an email to the newly registered healthcare worker containing their 
+    temporary credentials via Mailtrap Sandbox.
+    """
+    conf = ConnectionConfig(
+        MAIL_USERNAME=SMTP_USER,
+        MAIL_PASSWORD=SMTP_PASSWORD,
+        MAIL_FROM=EMAIL_FROM,
+        MAIL_PORT=SMTP_PORT,
+        MAIL_SERVER=SMTP_HOST,
+        MAIL_STARTTLS=True,
+        MAIL_SSL_TLS=False,
+        USE_CREDENTIALS=True,
+        VALIDATE_CERTS=True
+    )
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.3.1/css/all.min.css" rel="stylesheet">
+        <style>
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }}
+            .wrapper {{ width: 100%; table-layout: fixed; background-color: #ecf2f8; padding-bottom: 40px; padding-top: 40px; }}
+            .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border: none; border-radius: 12px; overflow: hidden; box-shadow: -8px -8px 12px rgba(255, 255, 255, 0.3), 8px  8px 12px rgba(0, 0, 0, 0.2); }}
+            .header {{ background: linear-gradient(145deg, #c8d4f0 0%, #8fa8e0 18%, #4a6cbe 36%, #1e3d9e 52%, #0d2272 68%, #050e40 85%, #020930 100%); padding: 35px 20px; text-align: center; }}
+            .header h1 {{ color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }}
+            .header p {{ color: #e2f0d9; margin: 8px 0 0; font-size: 14px; letter-spacing: 1px; }}
+            .content {{ padding: 40px 35px; color: #333333; line-height: 1.6; }}
+            .welcome-text {{ font-size: 18px; color: #0a4f76; margin-top: 0; margin-bottom: 15px; }}
+            .intro-p {{ font-size: 15px; color: #555555; margin-bottom: 25px; }}
+            .cred-box {{ background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 5px solid #1a8a5e; border-radius: 8px; padding: 25px; margin: 25px 0; }}
+            .cred-title {{ font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-top: 0; margin-bottom: 15px; }}
+            .cred-row {{ margin-bottom: 12px; font-size: 15px; }}
+            .cred-row:last-child {{ margin-bottom: 0; }}
+            .cred-label {{ color: #475569; font-weight: 600; display: inline-block; width: 150px; }}
+            .cred-value {{ color: #0f172a; font-family: monospace; font-size: 15px; }}
+            .password-highlight {{ background-color: #f1f5f9; border: 1px dashed #cbd5e1; color: #dc2626; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 16px; letter-spacing: 0.5px; }}
+            .role-badge {{ display: inline-block; background-color: #e0f2fe; color: #0369a1; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 50px; text-transform: uppercase; letter-spacing: 0.5px; }}
+            .notice-box {{ background-color: #fffbec; border: 1px solid #ffe0b2; border-radius: 8px; padding: 15px 20px; margin-top: 30px; }}
+            .notice-text {{ color: #b7791f; font-size: 13px; margin: 0; font-weight: 500; }}
+            .strong-text {{ display: inline-block; margin-bottom: 4px; }}
+            .footer {{ background-color: #f8fafc; padding: 25px; text-align: center; color: #64748b; font-size: 12px; border-top: 1px solid #f1f5f9; }}
+            .footer p {{ margin: 4px 0; }}
+        </style>
+    </head>
+    <body>
+        <div class="wrapper">
+            <div class="container">
+                <!-- Header Component -->
+                <div class="header">
+                    <h1><i class="fa-solid fa-hospital-user"></i> Barangay Veinte Reales</h1>
+                    <p>Electronic Medical Records (EMR) System</p>
+                </div>
+                
+                <!-- Main Body Content -->
+                <div class="content">
+                    <p class="welcome-text">Mabuhay, <strong>{name}</strong>!</p>
+                    <p class="intro-p">Matagumpay na nairerehistro ng System Administrator ang iyong account bilang isang opisyal na kawani sa ating tanggapan. Maaari mo nang gamitin ang mga sumusunod na temporary credentials para sa iyong paunang login:</p>
+                    
+                    <!-- Secured Credentials Grid Box -->
+                    <div class="cred-box">
+                        <p class="cred-title">Account Access Information</p>
+                        <div class="cred-row">
+                            <span class="cred-label">Assigned Role:</span>
+                            <span class="role-badge">{role}</span>
+                        </div>
+                        <div class="cred-row">
+                            <span class="cred-label">Email Address:</span>
+                            <span class="cred-value"><strong>{email}</strong></span>
+                        </div>
+                        <div class="cred-row">
+                            <span class="cred-label">Temp Password:</span>
+                            <span><code class="password-highlight">{temp_password}</code></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Compliance and Security Warnings -->
+                    <div class="notice-box">
+                        <div class="notice-text">
+                            <div class="strong-text">
+                                <i class="fa-solid fa-triangle-exclamation"></i> <strong>PAALALANG SEGURIDAD:</strong> 
+                            </div>
+                            <p style="margin: 4px 0 0 0;">Para sa proteksyon ng data ng ating mga pasyente, hihingan ka ng system na palitan kaagad ang temporary password na ito ng iyong sarili at permanenteng password sa sandaling makapag-login ka sa unang pagkakataon.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- System Footer Footer -->
+                <div class="footer">
+                    <p>This is an automated system-generated notification from District 1 Health Office.</p>
+                    <p>Please do not reply directly to this email address.</p>
+                    <p>&copy; {2026} Barangay Veinte Reales Health Center. All rights reserved.</p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    message = MessageSchema(
+        subject="EMR System - Account Activated and Temporary Password",
+        recipients=[email],
+        body=html_content,
+        subtype=MessageType.html
+    )
+
+    try:
+        fm = FastMail(conf)
+        await fm.send_message(message)
+        print("======== [SUCCESS] EMAIL SENT SUCCESSFULLY FROM EMAIL_UTILS.PY ========")
+    except Exception as e:
+        print(f"======== [ERROR] EMAIL_UTILS FAILED: {str(e)} ========")
 
 def send_otp_email(recipient_email: str, recipient_name: str, otp_code: str, purpose: str = "registration") -> bool:
     """
