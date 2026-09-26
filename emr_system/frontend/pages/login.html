@@ -5,139 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valenzuela District 1 EMR — Sign In</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --navy:#0b1f4b; --navy-mid:#1a3a7c; --blue:#2255c4; --blue-light:#3b72e8;
-            --periwinkle:#7b9ee8; --lavender:#c5d0f0; --white:#ffffff; --off-white:#f4f7ff;
-            --text:#0b1f4b; --text-muted:#6b7fa8; --border:#dce5f5; --danger:#c0392b;
-            --font:'Inter',sans-serif; --serif:'Playfair Display',Georgia,serif;
-        }
-        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        html,body{height:100%;font-family:var(--font);overflow:hidden;}
-
-        .page{display:flex;height:100vh;width:100vw;}
-
-        /* LEFT */
-        .left{width:42%;background:var(--white);display:flex;flex-direction:column;
-            justify-content:space-between;padding:48px 52px;position:relative;z-index:2;}
-        .org-tag{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-            color:var(--blue);margin-bottom:10px;}
-        .system-name{font-family:var(--serif);font-size:32px;font-weight:700;color:var(--navy);
-            line-height:1.15;margin-bottom:6px;}
-        .system-sub{font-size:13px;color:var(--text-muted);font-weight:400;line-height:1.5;}
-        .left-center{flex:1;display:flex;align-items:center;}
-        .info-block{max-width:320px;}
-        .info-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;
-            color:var(--periwinkle);margin-bottom:10px;}
-        .info-title{font-family:var(--serif);font-size:21px;color:var(--navy);
-            margin-bottom:14px;line-height:1.3;}
-        .info-list{list-style:none;display:flex;flex-direction:column;gap:10px;}
-        .info-list li{display:flex;align-items:center;gap:10px;font-size:13px;
-            color:var(--text-muted);font-weight:500;}
-        .info-list li::before{content:'';width:5px;height:5px;border-radius:50%;
-            background:var(--blue-light);flex-shrink:0;}
-        .left-foot{font-size:11px;color:var(--lavender);font-weight:500;}
-
-        /* RIGHT */
-        .right{width:58%;position:relative;display:flex;align-items:center;
-            justify-content:center;overflow:hidden;}
-        .right-bg{position:absolute;inset:0;
-            background:linear-gradient(145deg,#c8d4f0 0%,#8fa8e0 18%,#4a6cbe 36%,
-            #1e3d9e 52%,#0d2272 68%,#050e40 85%,#020930 100%);}
-        .right-fade{position:absolute;inset:0;
-            background:linear-gradient(90deg,rgba(255,255,255,.18) 0%,transparent 30%);}
-        .right-texture{position:absolute;inset:0;
-            background-image:radial-gradient(circle at 70% 30%,rgba(100,140,220,.12) 0%,transparent 60%),
-            radial-gradient(circle at 30% 80%,rgba(30,60,160,.15) 0%,transparent 50%);}
-
-        /* CARD */
-        .card{position:relative;z-index:2;width:380px;
-            background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);
-            border-radius:18px;padding:40px 38px 34px;
-            backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-            box-shadow:0 8px 48px rgba(5,14,64,.45),inset 0 1px 0 rgba(255,255,255,.15);}
-        .card-eyebrow{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-            color:var(--lavender);margin-bottom:6px;}
-        .card-title{font-family:var(--serif);font-size:28px;color:var(--white);
-            margin-bottom:4px;line-height:1.2;}
-        .card-sub{font-size:12.5px;color:rgba(255,255,255,.5);margin-bottom:28px;}
-
-        /* Form */
-        .field{margin-bottom:16px;}
-        .field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;
-            letter-spacing:.08em;color:rgba(255,255,255,.6);margin-bottom:7px;}
-        .field input{width:100%;padding:11px 14px;background:rgba(255,255,255,.10);
-            border:1px solid rgba(255,255,255,.20);border-radius:9px;color:var(--white);
-            font-family:var(--font);font-size:14px;outline:none;transition:all .18s;}
-        .field input::placeholder{color:rgba(255,255,255,.3);}
-        .field input:focus{border-color:rgba(255,255,255,.55);background:rgba(255,255,255,.16);
-            box-shadow:0 0 0 3px rgba(255,255,255,.08);}
-        .pw-wrap{position:relative;}
-        .pw-wrap input{padding-right:52px;}
-        .pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);
-            background:none;border:none;color:rgba(255,255,255,.45);font-size:11.5px;
-            font-weight:600;cursor:pointer;font-family:var(--font);letter-spacing:.04em;
-            text-transform:uppercase;transition:color .15s;}
-        .pw-toggle:hover{color:rgba(255,255,255,.85);}
-
-        .alert{display:none;background:rgba(192,57,43,.2);border:1px solid rgba(192,57,43,.4);
-            border-radius:8px;padding:10px 13px;font-size:12.5px;color:#ff9d93;
-            margin-bottom:14px;line-height:1.5;}
-        .alert.show{display:block;}
-        .lockout{display:none;background:rgba(192,57,43,.15);border:1px solid rgba(192,57,43,.3);
-            border-radius:8px;padding:12px 14px;font-size:12.5px;color:#ff9d93;
-            margin-bottom:14px;text-align:center;line-height:1.6;}
-        .lockout.show{display:block;}
-        .lockout-count{font-size:24px;font-weight:700;display:block;margin-top:4px;
-            letter-spacing:3px;}
-        .attempts-text{display:none;font-size:11.5px;color:rgba(255,160,150,.9);margin-bottom:12px;}
-        .attempts-text.show{display:block;}
-
-        .btn-submit{width:100%;padding:13px;margin-top:4px;background:var(--white);
-            color:var(--navy);border:none;border-radius:9px;font-family:var(--font);
-            font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.02em;transition:all .18s;}
-        .btn-submit:hover:not(:disabled){background:var(--off-white);transform:translateY(-1px);
-            box-shadow:0 6px 20px rgba(5,14,64,.4);}
-        .btn-submit:disabled{opacity:.5;cursor:not-allowed;transform:none;}
-
-        .card-divider{height:1px;background:rgba(255,255,255,.12);margin:22px 0;}
-        .card-foot{text-align:center;font-size:11.5px;color:rgba(255,255,255,.32);line-height:1.6;}
-
-        /* SESSION LOCK */
-        #sessionLock{display:none;position:fixed;inset:0;background:rgba(5,14,64,.92);
-            backdrop-filter:blur(10px);z-index:9999;align-items:center;justify-content:center;}
-        #sessionLock.show{display:flex;}
-        .lock-card{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);
-            border-radius:16px;padding:40px 36px;text-align:center;width:340px;
-            backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.5);}
-        .lock-card h2{font-family:var(--serif);font-size:22px;color:var(--white);margin-bottom:8px;}
-        .lock-card p{color:rgba(255,255,255,.5);font-size:13px;margin-bottom:22px;line-height:1.55;}
-        .lock-card input{width:100%;padding:11px 14px;background:rgba(255,255,255,.10);
-            border:1px solid rgba(255,255,255,.22);border-radius:9px;color:var(--white);
-            font-size:14px;margin-bottom:10px;outline:none;font-family:var(--font);}
-        .lock-card input:focus{border-color:rgba(255,255,255,.5);}
-        .lock-card input::placeholder{color:rgba(255,255,255,.3);}
-        #unlockError{color:#ff9d93;font-size:12px;margin-bottom:10px;display:none;}
-        .btn-unlock{width:100%;padding:12px;background:var(--white);color:var(--navy);
-            border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;
-            font-family:var(--font);transition:all .15s;}
-        .btn-unlock:hover{background:var(--off-white);}
-        .lock-switch{display:block;margin-top:14px;font-size:11.5px;color:rgba(255,255,255,.3);
-            cursor:pointer;background:none;border:none;text-decoration:underline;
-            font-family:var(--font);}
-
-        @media(max-width:760px){
-            .left{display:none;}
-            .right{width:100%;}
-            .card{width:calc(100% - 40px);margin:20px;}
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" type="image/png" href="frontend/img/DARK MODE (1).png">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="frontend/css/login.css">
+    <link rel="stylesheet" href="/frontend/vendor/fontawesome/css/all.min.css">
 </head>
 <body>
 <div class="page">
 
     <div class="left">
+        <!-- <img class="emrlogo" scr="frontend/img/DARK MODE (1).png" alt=""> -->
+        <div class="logo-container">
+            <img src="frontend/img/VC_Logo.png" class="logo1" alt="EMR Logo"> 
+            <img src="frontend/img/Valenzuelife-Web.png" class="logo2" alt="EMR Logo">
+            <img src="frontend/img/BagongPilipinas-Logo.png" class="logo3" alt="EMR Logo">
+        </div>
         <div class="left-top">
             <div class="org-tag">Valenzuela City &middot; District 1</div>
             <div class="system-name">Electronic<br>Medical Records</div>
@@ -164,7 +49,6 @@
         <div class="right-fade"></div>
         <div class="right-texture"></div>
         <div class="card">
-            <div class="card-eyebrow">Barangay Veinte Reales</div>
             <div class="card-title">Sign In</div>
             <div class="card-sub">Access the health management system</div>
 
@@ -177,16 +61,22 @@
 
             <form id="loginForm" novalidate>
                 <div class="field">
-                    <label>Email Address</label>
+                    <label for="email">Email Address</label>
+                    <div class="input-icon-wrap">
+                        <i class="fa-solid fa-envelope"></i>
                     <input type="email" id="email" placeholder="your@email.com"
                         autocomplete="username" required>
+                    </div>
                 </div>
                 <div class="field">
-                    <label>Password</label>
-                    <div class="pw-wrap">
-                        <input type="password" id="password" placeholder="Enter your password"
-                            autocomplete="current-password" required>
-                        <button type="button" class="pw-toggle" id="pwToggle">Show</button>
+                    <label for="password">Password</label>
+                    <div class="pw-wrap input-icon-wrap">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
+                        <!-- Font Awesome Icon inside the button -->
+                        <button type="button" class="pw-toggle" id="pwToggle" aria-label="Show password">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
                     </div>
                 </div>
                 <button type="submit" class="btn-submit" id="submitBtn">Sign In</button>
@@ -215,12 +105,28 @@ const API_BASE = window.location.origin;
 const MAX_ATTEMPTS = 5;
 let failedCount = 0;
 
-document.getElementById('pwToggle').addEventListener('click', function () {
+document.getElementById('pwToggle').addEventListener('click', function (e) {
+    e.preventDefault(); // Prevents form jumping/unexpected behavior
+    
     const pw = document.getElementById('password');
+    const icon = this.querySelector('i');
     const hidden = pw.type === 'password';
+    
+    // 1. Toggle visibility 
     pw.type = hidden ? 'text' : 'password';
-    this.textContent = hidden ? 'Hide' : 'Show';
-});
+    
+    // 2. Toggle Font Awesome class states
+    if (hidden) {
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+    
+    // 3. Update accessibility label
+    this.setAttribute('aria-label', hidden ? 'Hide password' : 'Show password');
+})
 
 function showAlert(msg) {
     const el = document.getElementById('alertBox');
@@ -237,11 +143,28 @@ function updateAttempts(failed) {
     }
 }
 
+// --- Enable/disable Sign In button based on input state ---
+const emailInput = document.getElementById('email');
+const passwordInput = document.getElementById('password');
+const submitBtn = document.getElementById('submitBtn');
+let isLockedOut = false; // track lockout separately from "fields filled" state
+
+function updateSubmitState() {
+    const filled = emailInput.value.trim() !== '' && passwordInput.value.trim() !== '';
+    submitBtn.disabled = !filled || isLockedOut;
+}
+
+emailInput.addEventListener('input', updateSubmitState);
+passwordInput.addEventListener('input', updateSubmitState);
+
+// Run once on load in case of browser autofill on refresh
+updateSubmitState();
+
 function startLockout(mins) {
     document.getElementById('lockoutBox').classList.add('show');
     document.getElementById('attemptsText').classList.remove('show');
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true;
+    isLockedOut = true;
+    updateSubmitState(); // NEW — replaces the old `btn.disabled = true;`
     let secs = mins * 60;
     const el = document.getElementById('lockoutCount');
     const tick = setInterval(() => {
@@ -251,7 +174,9 @@ function startLockout(mins) {
         if (secs < 0) {
             clearInterval(tick);
             document.getElementById('lockoutBox').classList.remove('show');
-            btn.disabled = false; failedCount = 0;
+            isLockedOut = false;
+            updateSubmitState(); // NEW — replaces `btn.disabled = false;`
+            failedCount = 0;
         }
     }, 1000);
 }
@@ -259,13 +184,13 @@ function startLockout(mins) {
 document.getElementById('loginForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     hideAlert();
-    const email    = document.getElementById('email').value.trim();
+    const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
     if (!email || !password) { showAlert('Please enter your email and password.'); return; }
     const btn = document.getElementById('submitBtn');
     btn.disabled = true; btn.textContent = 'Signing in...';
     try {
-        const res  = await fetch(API_BASE + '/api/auth/login', {
+        const res = await fetch(API_BASE + '/api/auth/login', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
         });
@@ -292,6 +217,7 @@ document.getElementById('loginForm').addEventListener('submit', async function (
         showAlert('Cannot connect to server. Please check your connection.');
     } finally {
         btn.disabled = false; btn.textContent = 'Sign In';
+        updateSubmitState(); // instead of btn.disabled = false;
     }
 });
 
