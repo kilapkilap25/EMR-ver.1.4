@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventory — EMR System</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+    .bToBoard{
+        color:white;
+        background-color: teal;
+        border:0;
+        border-radius:8px;
+        padding:11px 15px;
+        font:600 13px Inter,sans-serif;
+        cursor:pointer;
+        text-decoration:none;
+    }
+:root {
+    --navy:#0b1f4b;
+    --blue:#2255c4;
+    --teal:#1a8a5e;
+    --red:#e74c3c;
+    --orange:#f39c12;
+    --bg:#f0f4f8;
+    --card:#fff;
+    --text:#0b1f4b;
+    --muted:#6b7fa8;
+    --border:#dce5f5;
+}
+* { box-sizing:border-box; }
+body {
+    margin:0;
+    font-family:Inter,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+}
+main {
+    max-width:1500px;
+    margin:auto;
+    padding:28px;
+}
+.header {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-bottom:24px;
+}
+h1 { margin:0 0 6px; font-size:26px; }
+.subtitle { color:var(--muted); font-size:13px; }
+.actions { display:flex; gap:10px; flex-wrap:wrap; }
+
+button,.btn {
+    border:0;
+    border-radius:8px;
+    padding:11px 15px;
+    font:600 13px Inter,sans-serif;
+    cursor:pointer;
+}
+.primary { background:var(--blue); color:white; }
+.success { background:var(--teal); color:white; }
+.light { background:white; color:var(--navy); border:1px solid var(--border); }
+button:hover { opacity:.88; }
+
+.cards {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(150px,1fr));
+    gap:16px;
+    margin-bottom:22px;
+}
+.card {
+    background:white;
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:20px;
+    box-shadow:0 2px 10px #0b1f4b08;
+}
+.card-label { color:var(--muted); font-size:12px; }
+.card-value { font-size:26px; font-weight:700; margin-top:10px; }
+.card-value.low { color:var(--orange); }
+.card-value.out { color:var(--red); }
+
+.panel {
+    background:white;
+    border:1px solid var(--border);
+    border-radius:12px;
+    margin-bottom:22px;
+    overflow:hidden;
+}
+.panel-head {
+    padding:18px 20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    border-bottom:1px solid var(--border);
+}
+.panel-head h2 { font-size:16px; margin:0; }
+.filters {
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    padding:16px 20px;
+}
+input,select {
+    padding:11px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font:13px Inter,sans-serif;
+    background:white;
+    color:var(--text);
+}
+input[type="search"] { min-width:220px; flex:1; }
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; min-width:850px; }
+th {
+    text-align:left;
+    background:#f8faff;
+    color:var(--muted);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.4px;
+    padding:13px 16px;
+}
+td {
+    padding:14px 16px;
+    border-top:1px solid #edf1f8;
+    font-size:13px;
+}
+.badge {
+    display:inline-block;
+    padding:5px 9px;
+    border-radius:20px;
+    font-size:11px;
+    font-weight:600;
+    background:#eaf1ff;
+    color:var(--blue);
+}
+.badge.low { background:#fff4df; color:#a66300; }
+.badge.out { background:#ffebeb; color:#c0392b; }
+.badge.ok { background:#e6f6ef; color:#16764c; }
+.stock { font-weight:700; }
+.empty { padding:35px; text-align:center; color:var(--muted); }
+.message { padding:12px 20px; font-size:13px; display:none; }
+.message.error { display:block; background:#fff0f0; color:#b42318; }
+.message.good { display:block; background:#eaf8f0; color:#16764c; }
+
+.modal {
+    display:none;
+    position:fixed;
+    inset:0;
+    background:#06142dcc;
+    z-index:99;
+    align-items:center;
+    justify-content:center;
+    padding:18px;
+}
+.modal-box {
+    background:white;
+    width:100%;
+    max-width:500px;
+    border-radius:14px;
+    padding:24px;
+    max-height:90vh;
+    overflow:auto;
+}
+.modal-box h2 { margin:0 0 18px; font-size:19px; }
+.form-group { margin-bottom:14px; }
+.form-group label {
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    margin-bottom:7px;
+}
+.form-group input,.form-group select { width:100%; }
+.modal-actions {
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:20px;
+}
+.note { color:var(--muted); font-size:12px; line-height:1.5; }
+
+
+/* Inventory accordion */
+.inventory-accordion {
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    padding:16px 20px 20px;
+}
+.inventory-section {
+    border:1px solid var(--border);
+    border-radius:10px;
+    overflow:hidden;
+    background:#fff;
+}
+.inventory-section summary {
+    list-style:none;
+    cursor:pointer;
+    padding:15px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    background:#f8faff;
+    font-size:13px;
+    font-weight:700;
+    user-select:none;
+}
+.inventory-section summary::-webkit-details-marker { display:none; }
+.inventory-section summary::after {
+    content:"＋";
+    font-size:18px;
+    color:var(--muted);
+    line-height:1;
+}
+.inventory-section[open] summary::after { content:"−"; }
+.inventory-section summary:hover { background:#f1f5fc; }
+.inventory-section .category-count {
+    margin-left:auto;
+    color:var(--muted);
+    font-size:11px;
+    font-weight:600;
+}
+.inventory-section .table-wrap {
+    border-top:1px solid var(--border);
+}
+.inventory-section table { min-width:850px; }
+@media(max-width:850px) {
+    main { padding:16px; }
+    .cards { grid-template-columns:repeat(2,minmax(130px,1fr)); }
+}
+</style>
+</head>
+
+<body>
+<main>
+    <div class="header">
+        <div>
+            <a class="bToBoard" href="/frontend/pages/dashboard.html"> Back to Dashboard</a>
+            <br><br>
+            <h1>Inventory Management</h1>
+            <div class="subtitle">Manage medicines, vaccines, and medical supplies</div>
+        </div>
+        <div class="actions">
+            <button class="light" onclick="downloadTemplate()">Download CSV Template</button>
+            <button class="light" onclick="openImport()">Import CSV</button>
+            <button class="success" onclick="openReceive()">+ Receive Stock</button>
+        </div>
+    </div>
+
+    <div class="cards">
+        <div class="card">
+            <div class="card-label">Total Items</div>
+            <div class="card-value" id="totalItems">0</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Medicine</div>
+            <div class="card-value" id="medicineCount">0</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Low Stock</div>
+            <div class="card-value low" id="lowCount">0</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Out of Stock</div>
+            <div class="card-value out" id="outCount">0</div>
+        </div>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Inventory Items</h2>
+            <button class="light" onclick="loadInventory()">↻ Refresh</button>
+        </div>
+
+        <div class="filters">
+            <input type="search" id="searchInput" placeholder="Search item name or code..." oninput="renderInventory()">
+            <select id="categoryFilter" onchange="renderInventory()">
+                <option value="">All Categories</option>
+                <option>Medicine</option>
+                <option>Vaccine</option>
+                <option>Medical Supply</option>
+            </select>
+            <select id="stockFilter" onchange="renderInventory()">
+                <option value="">All Stock Levels</option>
+                <option value="low">Low Stock</option>
+                <option value="out">Out of Stock</option>
+                <option value="ok">In Stock</option>
+            </select>
+        </div>
+
+        <div id="inventoryAccordion" class="inventory-accordion">
+            <div class="empty">Loading inventory...</div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Recent Stock Transactions</h2>
+            <button class="light" onclick="loadTransactions()">↻ Refresh History</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Item</th>
+                        <th>Transaction</th>
+                        <th>Quantity</th>
+                        <th>Before</th>
+                        <th>After</th>
+                        <th>Remarks</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionBody">
+                    <tr><td colspan="7" class="empty">Loading transactions...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<!-- CSV IMPORT MODAL -->
+<div class="modal" id="importModal">
+    <div class="modal-box">
+        <h2>Import Inventory CSV</h2>
+        <p class="note">
+            Import new inventory items with their initial stock.
+            Existing item codes will be skipped.
+        </p>
+        <div class="form-group">
+            <label>Select CSV File</label>
+            <input type="file" id="csvFile" accept=".csv">
+        </div>
+        <p class="note">
+            Required columns: item_code, item_name, category, unit, current_stock.<br>
+            Optional: reorder_level, batch_number, expiration_date.
+        </p>
+        <div class="modal-actions">
+            <button class="light" onclick="closeModal('importModal')">Cancel</button>
+            <button class="primary" onclick="importCSV()">Import CSV</button>
+        </div>
+    </div>
+</div>
+
+<!-- RECEIVE STOCK MODAL -->
+<div class="modal" id="receiveModal">
+    <div class="modal-box">
+        <h2>Receive Stock</h2>
+        <div class="form-group">
+            <label>Inventory Item</label>
+            <select id="receiveItem"></select>
+        </div>
+        <div class="form-group">
+            <label>Quantity Received</label>
+            <input type="number" id="receiveQuantity" min="1" step="1" placeholder="Enter quantity">
+        </div>
+        <div class="form-group">
+            <label>Remarks (Optional)</label>
+            <input type="text" id="receiveRemarks" placeholder="e.g. New delivery">
+        </div>
+        <div class="modal-actions">
+            <button class="light" onclick="closeModal('receiveModal')">Cancel</button>
+            <button class="success" onclick="submitReceive()">Save Stock</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let inventoryItems = [];
+let transactions = [];
+
+function showMessage(text, type = "good") {
+    const box = document.getElementById("message");
+    box.textContent = text;
+    box.className = "message " + type;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => box.className = "message", 6000);
+}
+
+async function readResponse(response) {
+    let data;
+    try { data = await response.json(); }
+    catch { data = {}; }
+
+    if (!response.ok) {
+        throw new Error(data.detail || `Request failed (${response.status})`);
+    }
+    return data;
+}
+
+async function loadInventory() {
+    try {
+        const response = await fetch("/api/inventory", {
+            credentials: "include"
+        });
+        inventoryItems = await readResponse(response);
+        updateCards();
+        renderInventory();
+        populateReceiveItems();
+    } catch (error) {
+        document.getElementById("inventoryAccordion").innerHTML =
+            `<div class="empty">${escapeHTML(error.message)}</div>`;
+        showMessage("Unable to load inventory: " + error.message, "error");
+    }
+}
+
+function getStockStatus(item) {
+    const stock = Number(item.current_stock || 0);
+    const reorder = Number(item.reorder_level || 0);
+
+    if (stock <= 0) return "out";
+    if (stock <= reorder) return "low";
+    return "ok";
+}
+
+function updateCards() {
+    document.getElementById("totalItems").textContent = inventoryItems.length;
+    document.getElementById("medicineCount").textContent =
+        inventoryItems.filter(i => i.category === "Medicine").length;
+    document.getElementById("lowCount").textContent =
+        inventoryItems.filter(i => getStockStatus(i) === "low").length;
+    document.getElementById("outCount").textContent =
+        inventoryItems.filter(i => getStockStatus(i) === "out").length;
+}
+
+function renderInventory() {
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    const category = document.getElementById("categoryFilter").value;
+    const stockFilter = document.getElementById("stockFilter").value;
+
+    const filtered = inventoryItems.filter(item => {
+        const matchesSearch =
+            (item.item_name || "").toLowerCase().includes(search) ||
+            (item.item_code || "").toLowerCase().includes(search);
+
+        const matchesCategory = !category || item.category === category;
+        const matchesStock = !stockFilter || getStockStatus(item) === stockFilter;
+
+        return matchesSearch && matchesCategory && matchesStock;
+    });
+
+    const container = document.getElementById("inventoryAccordion");
+
+    if (!filtered.length) {
+        container.innerHTML = `<div class="empty">No inventory items found.</div>`;
+        return;
+    }
+
+    const categories = [
+        { name: "Medicine", icon: "💊", description: "Medicines and pharmaceutical items" },
+        { name: "Vaccine", icon: "💉", description: "Vaccines and immunization supplies" },
+        { name: "Medical Supply", icon: "🩹", description: "General medical supplies and equipment" }
+    ];
+
+    container.innerHTML = categories.map((categoryInfo, index) => {
+        const items = filtered.filter(item => item.category === categoryInfo.name);
+
+        if (!items.length) return "";
+
+        const lowCount = items.filter(item => getStockStatus(item) === "low").length;
+        const outCount = items.filter(item => getStockStatus(item) === "out").length;
+
+        const rows = items.map(item => {
+            const status = getStockStatus(item);
+            const statusText =
+                status === "out" ? "Out of Stock" :
+                status === "low" ? "Low Stock" :
+                "In Stock";
+
+            return `<tr>
+                <td>${escapeHTML(item.item_code)}</td>
+                <td><strong>${escapeHTML(item.item_name)}</strong></td>
+                <td>${escapeHTML(item.category)}</td>
+                <td class="stock">${Number(item.current_stock || 0)}</td>
+                <td>${escapeHTML(item.unit)}</td>
+                <td>${Number(item.reorder_level || 0)}</td>
+                <td>${escapeHTML(item.expiration_date || "—")}</td>
+                <td><span class="badge ${status}">${statusText}</span></td>
+            </tr>`;
+        }).join("");
+
+        return `
+            <details class="inventory-section" ${index === 0 ? "open" : ""}>
+                <summary>
+                    <span class="accordion-arrow">›</span>
+
+                    <span class="category-icon">${categoryInfo.icon}</span>
+
+                    <span class="category-title">
+                        <strong>${escapeHTML(categoryInfo.name)}</strong>
+                        <span class="category-subtitle">
+                            ${escapeHTML(categoryInfo.description)}
+                        </span>
+                    </span>
+
+                    <span class="category-count">
+                        <span class="count-pill">
+                            ${items.length} item${items.length === 1 ? "" : "s"}
+                        </span>
+                        ${lowCount ? `<span class="alert-pill">${lowCount} low</span>` : ""}
+                        ${outCount ? `<span class="out-pill">${outCount} out</span>` : ""}
+                    </span>
+                </summary>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Item Code</th>
+                                <th>Item Name</th>
+                                <th>Category</th>
+                                <th>Stock</th>
+                                <th>Unit</th>
+                                <th>Reorder Level</th>
+                                <th>Expiration</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            </details>`;
+    }).join("");
+
+    // True accordion behavior: only one category stays open.
+    const sections = container.querySelectorAll(".inventory-section");
+
+    sections.forEach(section => {
+        section.addEventListener("toggle", () => {
+            if (!section.open) return;
+
+            sections.forEach(other => {
+                if (other !== section) {
+                    other.open = false;
+                }
+            });
+        });
+    });
+}
+
+async function loadTransactions() {
+    try {
+        const response = await fetch("/api/inventory/transactions", {
+            credentials: "include"
+        });
+        transactions = await readResponse(response);
+        renderTransactions();
+    } catch (error) {
+        document.getElementById("transactionBody").innerHTML =
+            `<tr><td colspan="7" class="empty">${escapeHTML(error.message)}</td></tr>`;
+    }
+}
+
+function renderTransactions() {
+    const body = document.getElementById("transactionBody");
+
+    if (!transactions.length) {
+        body.innerHTML = `<tr><td colspan="7" class="empty">No transactions yet.</td></tr>`;
+        return;
+    }
+
+    body.innerHTML = transactions.map(t => `
+        <tr>
+            <td>${escapeHTML(t.created_at ? new Date(t.created_at).toLocaleString() : "—")}</td>
+            <td>${escapeHTML(t.item_name || "—")}</td>
+            <td>${escapeHTML(t.transaction_type || "—")}</td>
+            <td>${Number(t.quantity || 0)}</td>
+            <td>${Number(t.stock_before || 0)}</td>
+            <td>${Number(t.stock_after || 0)}</td>
+            <td>${escapeHTML(t.remarks || "—")}</td>
+        </tr>
+    `).join("");
+}
+
+function openImport() {
+    document.getElementById("csvFile").value = "";
+    document.getElementById("importModal").style.display = "flex";
+}
+
+function openReceive() {
+    if (!inventoryItems.length) {
+        showMessage("Import inventory items first before receiving stock.", "error");
+        return;
+    }
+    document.getElementById("receiveQuantity").value = "";
+    document.getElementById("receiveRemarks").value = "";
+    document.getElementById("receiveModal").style.display = "flex";
+}
+
+function closeModal(id) {
+    document.getElementById(id).style.display = "none";
+}
+
+function populateReceiveItems() {
+    const select = document.getElementById("receiveItem");
+    select.innerHTML = inventoryItems.map(item =>
+        `<option value="${Number(item.item_id)}">
+            ${escapeHTML(item.item_name)} (${escapeHTML(item.item_code)}) — Stock: ${Number(item.current_stock)}
+        </option>`
+    ).join("");
+}
+
+async function importCSV() {
+    const file = document.getElementById("csvFile").files[0];
+
+    if (!file) {
+        showMessage("Please select a CSV file.", "error");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const response = await fetch("/api/inventory/import-csv", {
+            method: "POST",
+            body: formData,
+            credentials: "include"
+        });
+
+        const result = await readResponse(response);
+        closeModal("importModal");
+
+        showMessage(
+            `Import completed. Imported: ${result.imported}. Skipped: ${result.skipped_count}.`
+        );
+
+        if (result.skipped_rows?.length) {
+            alert("Some rows were skipped:\n\n" + result.skipped_rows.join("\n"));
+        }
+
+        await loadInventory();
+        await loadTransactions();
+    } catch (error) {
+        showMessage("CSV import failed: " + error.message, "error");
+    }
+}
+
+async function submitReceive() {
+    const itemId = document.getElementById("receiveItem").value;
+    const quantity = Number(document.getElementById("receiveQuantity").value);
+    const remarks = document.getElementById("receiveRemarks").value.trim();
+
+    if (!itemId) {
+        showMessage("Please select an inventory item.", "error");
+        return;
+    }
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+        showMessage("Quantity must be a whole number greater than zero.", "error");
+        return;
+    }
+
+    const params = new URLSearchParams({
+        quantity: String(quantity),
+        remarks: remarks
+    });
+
+    try {
+        const response = await fetch(
+            `/api/inventory/receive-stock/${itemId}?${params.toString()}`,
+            {
+                method: "POST",
+                credentials: "include"
+            }
+        );
+
+        const result = await readResponse(response);
+        closeModal("receiveModal");
+        showMessage(result.message || "Stock received successfully.");
+
+        await loadInventory();
+        await loadTransactions();
+    } catch (error) {
+        showMessage("Unable to receive stock: " + error.message, "error");
+    }
+}
+
+function downloadTemplate() {
+    const csv = [
+        "item_code,item_name,category,unit,current_stock,reorder_level,batch_number,expiration_date",
+        "MED-001,Paracetamol 500mg,Medicine,tablet,100,20,BATCH001,2027-12-31",
+        "VAC-001,Example Vaccine,Vaccine,vial,50,10,BATCH002,2027-06-30",
+        "SUP-001,Syringe 5mL,Medical Supply,piece,200,30,,"
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "inventory_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[char]);
+}
+
+document.querySelectorAll(".modal").forEach(modal => {
+    modal.addEventListener("click", event => {
+        if (event.target === modal) modal.style.display = "none";
+    });
+});
+
+loadInventory();
+loadTransactions();
+</script>
+<script src="/frontend/js/websocket.js"></script>
+</body>
+</html>

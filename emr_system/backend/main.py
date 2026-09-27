@@ -23,7 +23,8 @@ load_dotenv()
 from database import engine, get_db, test_connection, get_barangay_name, Base
 from models.models import (
     User, Patient, HealthProblem, Pregnancy,
-    MedicalRecord, Immunization, Disease, DiseaseCase, AuditLog
+    MedicalRecord, Immunization, Disease, DiseaseCase, AuditLog,
+    InventoryItem, InventoryTransaction
 )
 from middleware.auth import (
     get_current_user, require_admin, log_audit, get_client_info,
@@ -34,6 +35,7 @@ from routers.users     import router as users_router
 from routers.patients  import router as patients_router
 from routers.analytics import router as analytics_router
 from routers.reports   import router as reports_router
+from routers.inventory import router as inventory_router
 # ── Rate limiter ──────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address)
 
@@ -433,7 +435,12 @@ def _auto_count_cases(db: Session, diagnosis: str, patient_id: int, date_recorde
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"🚀 EMR System starting — {get_barangay_name()}")
-    test_connection()
+
+    if test_connection():
+        InventoryItem.__table__.create(bind=engine, checkfirst=True)
+        InventoryTransaction.__table__.create(bind=engine, checkfirst=True)
+        print("✅ Inventory tables are ready.")
+
     print("✅ Ready.")
     yield
     print("🛑 Shutting down.")
@@ -446,7 +453,7 @@ app = FastAPI(
     version     = "2.0.0",
     lifespan    = lifespan,
     docs_url    = "/api/docs" if os.getenv("DEBUG", "False").lower() == "true" else None,
-    redoc_url   = None
+    redoc_url=  "/redoc"
 )
 
 # Rate limiter
@@ -506,7 +513,7 @@ app.include_router(hp_router)
 app.include_router(preg_router)
 app.include_router(disease_router)
 app.include_router(audit_router)
-
+app.include_router(inventory_router)
 # Static files
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))

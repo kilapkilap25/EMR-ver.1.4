@@ -1,15 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+import csv
+import io
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
 
 from database import get_db
-from models.models import (
-    InventoryItem,
-    InventoryStock,
-    InventoryTransaction,
-    User
-)
-from websocket_manager import manager
+from models.models import InventoryItem, InventoryTransaction
 
 
 router = APIRouter(
@@ -19,12 +16,61 @@ router = APIRouter(
 
 
 # ============================================================
+# HELPERS
+# ============================================================
+
+def item_to_dict(item):
+    return {
+        "item_id": item.item_id,
+        "item_code": item.item_code,
+        "item_name": item.item_name,
+        "category": item.category,
+        "unit": item.unit,
+        "current_stock": item.current_stock,
+        "reorder_level": item.reorder_level,
+        "batch_number": item.batch_number,
+        "expiration_date": (
+            item.expiration_date.isoformat()
+            if item.expiration_date else None
+        ),
+        "is_active": item.is_active,
+        "created_at": (
+            item.created_at.isoformat()
+            if item.created_at else None
+        ),
+        "updated_at": (
+            item.updated_at.isoformat()
+            if item.updated_at else None
+        )
+    }
+
+
+def transaction_to_dict(transaction):
+    return {
+        "transaction_id": transaction.transaction_id,
+        "item_id": transaction.item_id,
+        "item_name": (
+            transaction.item.item_name
+            if transaction.item else "Unknown"
+        ),
+        "transaction_type": transaction.transaction_type,
+        "quantity": transaction.quantity,
+        "stock_before": transaction.stock_before,
+        "stock_after": transaction.stock_after,
+        "remarks": transaction.remarks,
+        "created_at": (
+            transaction.created_at.isoformat()
+            if transaction.created_at else None
+        )
+    }
+
+
+# ============================================================
 # GET ALL INVENTORY ITEMS
 # ============================================================
 
 @router.get("")
 def get_inventory(db: Session = Depends(get_db)):
-
     items = (
         db.query(InventoryItem)
         .filter(InventoryItem.is_active == True)
@@ -32,509 +78,192 @@ def get_inventory(db: Session = Depends(get_db)):
         .all()
     )
 
-    result = []
+    return [item_to_dict(item) for item in items]
 
-    for item in items:
 
-        stock = (
-            db.query(InventoryStock)
-            .filter(
-                InventoryStock.item_id == item.item_id
+# ============================================================
+# IMPORT INVENTORY FROM CSV
+# CSV IMPORT ADDS ITEM DETAILS + INITIAL STOCK
+# ============================================================
+
+@router.post("/import-csv")
+async def import_inventory_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload a CSV file."
+        )
+
+    content = await file.read()
+
+    try:
+        text = content.decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(text))
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to read CSV file."
+        )
+
+    required_columns = {
+        "item_code",
+        "item_name",
+        "category",
+        "unit",
+        "current_stock"
+    }
+
+    if not reader.fieldnames or not required_columns.issubset(
+        set(reader.fieldnames)
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "CSV must include: item_code, item_name, "
+                "category, unit, current_stock. "
+                "Optional: reorder_level, batch_number, expiration_date."
             )
-            .first()
         )
 
-        quantity = stock.quantity if stock else 0
-
-        result.append({
-            "item_id": item.item_id,
-            "item_name": item.item_name,
-            "category": item.category,
-            "description": item.description,
-            "unit": item.unit,
-            "reorder_level": item.reorder_level,
-            "quantity": quantity,
-            "is_active": item.is_active,
-            "low_stock": (
-                quantity > 0
-                and quantity <= item.reorder_level
-            ),
-            "out_of_stock": quantity == 0,
-            "created_at": item.created_at,
-            "updated_at": item.updated_at
-        })
-
-    return result
-
-
-# ============================================================
-# GET SINGLE INVENTORY ITEM
-# ============================================================
-
-@router.get("/{item_id}")
-def get_inventory_item(
-    item_id: int,
-    db: Session = Depends(get_db)
-):
-
-    item = (
-        db.query(InventoryItem)
-        .filter(
-            InventoryItem.item_id == item_id,
-            InventoryItem.is_active == True
-        )
-        .first()
-    )
-
-    if not item:
-        raise HTTPException(
-            status_code=404,
-            detail="Inventory item not found."
-        )
-
-    stock = (
-        db.query(InventoryStock)
-        .filter(
-            InventoryStock.item_id == item_id
-        )
-        .first()
-    )
-
-    quantity = stock.quantity if stock else 0
-
-    return {
-        "item_id": item.item_id,
-        "item_name": item.item_name,
-        "category": item.category,
-        "description": item.description,
-        "unit": item.unit,
-        "reorder_level": item.reorder_level,
-        "quantity": quantity,
-        "is_active": item.is_active
-    }
-
-
-# ============================================================
-# CREATE INVENTORY ITEM
-# ============================================================
-
-@router.post("")
-async def create_inventory_item(
-    data: dict,
-    db: Session = Depends(get_db)
-):
-
-    item_name = str(
-        data.get("item_name", "")
-    ).strip()
-
-    category = data.get("category")
-    unit = str(
-        data.get("unit", "")
-    ).strip()
-
-    description = data.get("description")
-
-    reorder_level = int(
-        data.get("reorder_level", 10)
-    )
-
-    quantity = int(
-        data.get("quantity", 0)
-    )
-
-    user_id = data.get("user_id")
-
-    if not item_name:
-        raise HTTPException(
-            status_code=400,
-            detail="Item name is required."
-        )
-
-    if category not in [
+    valid_categories = {
         "Medicine",
         "Vaccine",
         "Medical Supply"
-    ]:
+    }
+
+    imported = 0
+    skipped = []
+
+    try:
+        for row_number, row in enumerate(reader, start=2):
+            code = (row.get("item_code") or "").strip()
+            name = (row.get("item_name") or "").strip()
+            category = (row.get("category") or "").strip()
+            unit = (row.get("unit") or "").strip()
+
+            if not code or not name or not unit:
+                skipped.append(
+                    f"Row {row_number}: Missing required item details."
+                )
+                continue
+
+            if category not in valid_categories:
+                skipped.append(
+                    f"Row {row_number}: Invalid category."
+                )
+                continue
+
+            try:
+                quantity = int(row.get("current_stock", "0"))
+                reorder_level = int(row.get("reorder_level") or 10)
+            except (ValueError, TypeError):
+                skipped.append(
+                    f"Row {row_number}: Stock and reorder level "
+                    "must be whole numbers."
+                )
+                continue
+
+            if quantity < 0 or reorder_level < 0:
+                skipped.append(
+                    f"Row {row_number}: Quantities cannot be negative."
+                )
+                continue
+
+            existing = (
+                db.query(InventoryItem)
+                .filter(InventoryItem.item_code == code)
+                .first()
+            )
+
+            if existing:
+                skipped.append(
+                    f"Row {row_number}: Item code '{code}' already exists."
+                )
+                continue
+
+            expiration_date = None
+            expiration_text = (
+                row.get("expiration_date") or ""
+            ).strip()
+
+            if expiration_text:
+                try:
+                    expiration_date = datetime.strptime(
+                        expiration_text, "%Y-%m-%d"
+                    ).date()
+                except ValueError:
+                    skipped.append(
+                        f"Row {row_number}: expiration_date must use "
+                        "YYYY-MM-DD format."
+                    )
+                    continue
+
+            item = InventoryItem(
+                item_code=code,
+                item_name=name,
+                category=category,
+                unit=unit,
+                current_stock=quantity,
+                reorder_level=reorder_level,
+                batch_number=(
+                    row.get("batch_number") or ""
+                ).strip() or None,
+                expiration_date=expiration_date,
+                is_active=True
+            )
+
+            db.add(item)
+            db.flush()
+
+            if quantity > 0:
+                transaction = InventoryTransaction(
+                    item_id=item.item_id,
+                    transaction_type="import",
+                    quantity=quantity,
+                    stock_before=0,
+                    stock_after=quantity,
+                    remarks="Initial stock from CSV import"
+                )
+                db.add(transaction)
+
+            imported += 1
+
+        db.commit()
+
+    except Exception as error:
+        db.rollback()
         raise HTTPException(
-            status_code=400,
-            detail="Invalid inventory category."
+            status_code=500,
+            detail=f"CSV import failed: {str(error)}"
         )
-
-    if not unit:
-        raise HTTPException(
-            status_code=400,
-            detail="Unit is required."
-        )
-
-    if reorder_level < 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Reorder level cannot be negative."
-        )
-
-    if quantity < 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Quantity cannot be negative."
-        )
-
-    if not user_id:
-        raise HTTPException(
-            status_code=400,
-            detail="User ID is required."
-        )
-
-    user = (
-        db.query(User)
-        .filter(User.user_id == user_id)
-        .first()
-    )
-
-    if not user:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid user."
-        )
-
-    existing = (
-        db.query(InventoryItem)
-        .filter(
-            InventoryItem.item_name == item_name,
-            InventoryItem.is_active == True
-        )
-        .first()
-    )
-
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail="An inventory item with this name already exists."
-        )
-
-    item = InventoryItem(
-        item_name=item_name,
-        category=category,
-        description=description,
-        unit=unit,
-        reorder_level=reorder_level,
-        is_active=True
-    )
-
-    db.add(item)
-    db.flush()
-
-    stock = InventoryStock(
-        item_id=item.item_id,
-        quantity=quantity
-    )
-
-    db.add(stock)
-
-    transaction = InventoryTransaction(
-        item_id=item.item_id,
-        transaction_type="Stock In",
-        quantity=quantity,
-        previous_stock=0,
-        new_stock=quantity,
-        remarks="Initial stock",
-        user_id=user_id
-    )
-
-    db.add(transaction)
-
-    db.commit()
-    db.refresh(item)
-
-    await manager.broadcast({
-        "type": "inventory_created",
-        "item_id": item.item_id,
-        "item_name": item.item_name
-    })
 
     return {
-        "message": "Inventory item created successfully.",
-        "item_id": item.item_id
+        "message": "CSV import completed.",
+        "imported": imported,
+        "skipped_count": len(skipped),
+        "skipped_rows": skipped
     }
 
 
 # ============================================================
-# UPDATE INVENTORY ITEM
+# RECEIVE STOCK
 # ============================================================
 
-@router.put("/{item_id}")
-async def update_inventory_item(
+@router.post("/receive-stock/{item_id}")
+def receive_stock(
     item_id: int,
-    data: dict,
+    quantity: int,
+    remarks: str = "",
     db: Session = Depends(get_db)
 ):
-
-    item = (
-        db.query(InventoryItem)
-        .filter(
-            InventoryItem.item_id == item_id,
-            InventoryItem.is_active == True
-        )
-        .first()
-    )
-
-    if not item:
-        raise HTTPException(
-            status_code=404,
-            detail="Inventory item not found."
-        )
-
-    user_id = data.get("user_id")
-
-    if not user_id:
-        raise HTTPException(
-            status_code=400,
-            detail="User ID is required."
-        )
-
-    user = (
-        db.query(User)
-        .filter(User.user_id == user_id)
-        .first()
-    )
-
-    if not user:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid user."
-        )
-
-    item_name = str(
-        data.get("item_name", "")
-    ).strip()
-
-    category = data.get("category")
-
-    unit = str(
-        data.get("unit", "")
-    ).strip()
-
-    description = data.get("description")
-
-    reorder_level = int(
-        data.get("reorder_level", 10)
-    )
-
-    if not item_name:
-        raise HTTPException(
-            status_code=400,
-            detail="Item name is required."
-        )
-
-    if category not in [
-        "Medicine",
-        "Vaccine",
-        "Medical Supply"
-    ]:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid inventory category."
-        )
-
-    if not unit:
-        raise HTTPException(
-            status_code=400,
-            detail="Unit is required."
-        )
-
-    if reorder_level < 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Reorder level cannot be negative."
-        )
-
-    duplicate = (
-        db.query(InventoryItem)
-        .filter(
-            InventoryItem.item_name == item_name,
-            InventoryItem.item_id != item_id,
-            InventoryItem.is_active == True
-        )
-        .first()
-    )
-
-    if duplicate:
-        raise HTTPException(
-            status_code=400,
-            detail="Another inventory item already uses this name."
-        )
-
-    item.item_name = item_name
-    item.category = category
-    item.unit = unit
-    item.description = description
-    item.reorder_level = reorder_level
-
-    db.commit()
-    db.refresh(item)
-
-    await manager.broadcast({
-        "type": "inventory_updated",
-        "item_id": item.item_id,
-        "item_name": item.item_name
-    })
-
-    return {
-        "message": "Inventory item updated successfully."
-    }
-
-
-# ============================================================
-# DELETE / DEACTIVATE INVENTORY ITEM
-# ============================================================
-
-@router.delete("/{item_id}")
-async def delete_inventory_item(
-    item_id: int,
-    db: Session = Depends(get_db)
-):
-
-    item = (
-        db.query(InventoryItem)
-        .filter(
-            InventoryItem.item_id == item_id,
-            InventoryItem.is_active == True
-        )
-        .first()
-    )
-
-    if not item:
-        raise HTTPException(
-            status_code=404,
-            detail="Inventory item not found."
-        )
-
-    item.is_active = False
-
-    db.commit()
-
-    await manager.broadcast({
-        "type": "inventory_deleted",
-        "item_id": item_id
-    })
-
-    return {
-        "message": "Inventory item deleted successfully."
-    }
-
-
-# ============================================================
-# STOCK IN
-# ============================================================
-
-@router.post("/{item_id}/stock-in")
-async def stock_in(
-    item_id: int,
-    data: dict,
-    db: Session = Depends(get_db)
-):
-
-    item = (
-        db.query(InventoryItem)
-        .filter(
-            InventoryItem.item_id == item_id,
-            InventoryItem.is_active == True
-        )
-        .first()
-    )
-
-    if not item:
-        raise HTTPException(
-            status_code=404,
-            detail="Inventory item not found."
-        )
-
-    quantity = int(
-        data.get("quantity", 0)
-    )
-
-    remarks = data.get("remarks")
-    user_id = data.get("user_id")
-
     if quantity <= 0:
         raise HTTPException(
             status_code=400,
-            detail="Quantity must be greater than 0."
+            detail="Quantity must be greater than zero."
         )
-
-    user = (
-        db.query(User)
-        .filter(User.user_id == user_id)
-        .first()
-    )
-
-    if not user:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid user."
-        )
-
-    stock = (
-        db.query(InventoryStock)
-        .filter(
-            InventoryStock.item_id == item_id
-        )
-        .first()
-    )
-
-    if not stock:
-        stock = InventoryStock(
-            item_id=item_id,
-            quantity=0
-        )
-        db.add(stock)
-        db.flush()
-
-    previous_stock = stock.quantity
-    new_stock = previous_stock + quantity
-
-    stock.quantity = new_stock
-
-    transaction = InventoryTransaction(
-        item_id=item_id,
-        transaction_type="Stock In",
-        quantity=quantity,
-        previous_stock=previous_stock,
-        new_stock=new_stock,
-        remarks=remarks,
-        user_id=user_id
-    )
-
-    db.add(transaction)
-
-    db.commit()
-
-    await manager.broadcast({
-        "type": "inventory_stock_updated",
-        "item_id": item_id,
-        "item_name": item.item_name,
-        "transaction_type": "Stock In",
-        "quantity": quantity,
-        "previous_stock": previous_stock,
-        "new_stock": new_stock
-    })
-
-    return {
-        "message": "Stock added successfully.",
-        "new_stock": new_stock
-    }
-
-
-# ============================================================
-# STOCK OUT
-# ============================================================
-
-@router.post("/{item_id}/stock-out")
-async def stock_out(
-    item_id: int,
-    data: dict,
-    db: Session = Depends(get_db)
-):
 
     item = (
         db.query(InventoryItem)
@@ -551,133 +280,47 @@ async def stock_out(
             detail="Inventory item not found."
         )
 
-    quantity = int(
-        data.get("quantity", 0)
-    )
-
-    remarks = data.get("remarks")
-    user_id = data.get("user_id")
-
-    if quantity <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Quantity must be greater than 0."
-        )
-
-    user = (
-        db.query(User)
-        .filter(User.user_id == user_id)
-        .first()
-    )
-
-    if not user:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid user."
-        )
-
-    stock = (
-        db.query(InventoryStock)
-        .filter(
-            InventoryStock.item_id == item_id
-        )
-        .first()
-    )
-
-    if not stock:
-        raise HTTPException(
-            status_code=400,
-            detail="Stock record not found."
-        )
-
-    previous_stock = stock.quantity
-
-    if quantity > previous_stock:
-        raise HTTPException(
-            status_code=400,
-            detail="Not enough stock available."
-        )
-
-    new_stock = previous_stock - quantity
-
-    stock.quantity = new_stock
+    stock_before = item.current_stock
+    item.current_stock += quantity
 
     transaction = InventoryTransaction(
-        item_id=item_id,
-        transaction_type="Stock Out",
+        item_id=item.item_id,
+        transaction_type="stock_in",
         quantity=quantity,
-        previous_stock=previous_stock,
-        new_stock=new_stock,
-        remarks=remarks,
-        user_id=user_id
+        stock_before=stock_before,
+        stock_after=item.current_stock,
+        remarks=remarks or "Stock received"
     )
 
     db.add(transaction)
-
     db.commit()
-
-    await manager.broadcast({
-        "type": "inventory_stock_updated",
-        "item_id": item_id,
-        "item_name": item.item_name,
-        "transaction_type": "Stock Out",
-        "quantity": quantity,
-        "previous_stock": previous_stock,
-        "new_stock": new_stock
-    })
+    db.refresh(item)
 
     return {
-        "message": "Stock removed successfully.",
-        "new_stock": new_stock
+        "message": "Stock received successfully.",
+        "item": item_to_dict(item)
     }
 
 
 # ============================================================
-# TRANSACTION HISTORY
+# GET TRANSACTION HISTORY
 # ============================================================
 
-@router.get("/{item_id}/transactions")
-def get_transactions(
-    item_id: int,
+@router.get("/transactions")
+def get_inventory_transactions(
     db: Session = Depends(get_db)
 ):
-
-    item = (
-        db.query(InventoryItem)
-        .filter(
-            InventoryItem.item_id == item_id
-        )
-        .first()
-    )
-
-    if not item:
-        raise HTTPException(
-            status_code=404,
-            detail="Inventory item not found."
-        )
-
     transactions = (
         db.query(InventoryTransaction)
-        .filter(
-            InventoryTransaction.item_id == item_id
-        )
         .order_by(
-            desc(InventoryTransaction.created_at)
+            InventoryTransaction.created_at.desc(),
+            InventoryTransaction.transaction_id.desc()
         )
+        .limit(500)
         .all()
     )
 
     return [
-        {
-            "transaction_id": transaction.transaction_id,
-            "item_id": transaction.item_id,
-            "transaction_type": transaction.transaction_type,
-            "quantity": transaction.quantity,
-            "previous_stock": transaction.previous_stock,
-            "new_stock": transaction.new_stock,
-            "remarks": transaction.remarks,
-            "user_id": transaction.user_id,
-            "created_at": transaction.created_at
-        }
+        transaction_to_dict(transaction)
         for transaction in transactions
     ]
